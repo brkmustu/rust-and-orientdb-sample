@@ -12,7 +12,7 @@ struct Customer {
     email: String,
 }
 
-async fn print_api(req: HttpRequest) -> impl Responder {
+async fn get_api(req: HttpRequest) -> impl Responder {
     let client = OrientDB::connect(("localhost", 2424)).unwrap();
     let session = client.session("CustomerDb", "root", "rootpwd").unwrap();
     let results: Vec<Result<OResult, OrientError>> = session
@@ -24,19 +24,15 @@ async fn print_api(req: HttpRequest) -> impl Responder {
     let customers: Vec<Customer> = results
         .into_iter()
         .filter_map(Result::ok)
-        .map(|res| {
-            Customer {
-                rid: res.get("id"),
-                firstname: res.get("firstname"),
-                lastname: res.get("lastname"),
-                email: res.get("email"),
-            }
+        .map(|res| Customer {
+            rid: res.get("id"),
+            firstname: res.get("firstname"),
+            lastname: res.get("lastname"),
+            email: res.get("email"),
         })
         .collect();
 
-    print!("{:?}", customers);
-
-    HttpResponse::Ok()
+    HttpResponse::Ok().json(customers) // <- send response
 }
 
 async fn insert_api(req: HttpRequest) -> impl Responder {
@@ -60,7 +56,7 @@ async fn insert_api(req: HttpRequest) -> impl Responder {
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
-            .route("/print", web::get().to(print_api))
+            .route("/", web::get().to(get_api))
             .route("/insert", web::get().to(insert_api))
     })
     .bind("127.0.0.1:8080")?
