@@ -1,64 +1,40 @@
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use orientdb_client::common::types::error::OrientError;
 use orientdb_client::common::types::OResult;
-use orientdb_client::types::value::OValue;
 use orientdb_client::OrientDB;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Customer {
+    rid: String,
     firstname: String,
     lastname: String,
     email: String,
-}
-
-// fn get_option_value(value: Option<&OValue>) -> &OValue {
-//     let Some(val) = value;
-//     val
-// }
-
-fn map_results_to_customers(results: Vec<Result<OResult, OrientError>>) -> Vec<Customer> {
-    let customers: Vec<Customer> = results
-    .into_iter()
-    .filter_map(Result::ok)
-    .map(|res| {
-        // let firstname = get_option_value(res.get_raw("firstname"));
-        // let dsds = res.get_raw();
-        // let mut map = res.into().unwrap().into_map().unwrap();
-        // let firstname = map.remove("firstname").unwrap().into_string().unwrap();
-        // let lastname = map.remove("lastname").unwrap().into_string().unwrap();
-        // let email = map.remove("email").unwrap().into_string().unwrap();
-        let firstname = String::from("keanu");
-        let lastname = String::from("reeves");
-        let email = String::from("keanu@reeves.com");
-        Customer { firstname, lastname, email }
-    })
-    .collect();
-    customers
 }
 
 async fn print_api(req: HttpRequest) -> impl Responder {
     let client = OrientDB::connect(("localhost", 2424)).unwrap();
     let session = client.session("CustomerDb", "root", "rootpwd").unwrap();
     let results: Vec<Result<OResult, OrientError>> = session
-        .query("select from Customers")
+        .query("select @rid.asString() as id, firstname, lastname, email from Customers")
         .run()
         .unwrap()
         .collect();
 
-    let customers = map_results_to_customers(results);
+    let customers: Vec<Customer> = results
+        .into_iter()
+        .filter_map(Result::ok)
+        .map(|res| {
+            Customer {
+                rid: res.get("id"),
+                firstname: res.get("firstname"),
+                lastname: res.get("lastname"),
+                email: res.get("email"),
+            }
+        })
+        .collect();
 
-    println!("{:?}", customers);
-    // println!("{:?}", print_type_of(&results));
-
-    // for item in results.iter() {
-    //     let fName = item.as_ref().unwrap().get_raw("firstname");
-    //     let Some(val) = fName;
-
-    //     // println!("{:?}", fName);
-
-    //     // .unwrap().get_raw("firstname")
-    // }
+    print!("{:?}", customers);
 
     HttpResponse::Ok()
 }
